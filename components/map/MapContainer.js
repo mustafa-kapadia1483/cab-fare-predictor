@@ -6,13 +6,11 @@ import { Box, useMantineTheme } from "@mantine/core";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_GL_ACCESS_TOKEN;
 
-const MapContainer = () => {
+const MapContainer = ({ map }) => {
   const theme = useMantineTheme();
-  console;
   const mapContainer = useRef(null);
-  const map = useRef(null);
-  const [lng, setLng] = useState(72.7948277);
-  const [lat, setLat] = useState(19.0685555);
+  const [lng, setLng] = useState(19.0685555);
+  const [lat, setLat] = useState(72.7948277);
   const [zoom, setZoom] = useState(15);
 
   useEffect(() => {
@@ -26,7 +24,7 @@ const MapContainer = () => {
       setLat(map.current.getCenter().lat.toFixed(4));
       setZoom(map.current.getZoom().toFixed(2));
     });
-  });
+  }, []);
 
   useEffect(() => {
     if (map.current && !theme.colorScheme) return; // initialize map only once
@@ -42,8 +40,18 @@ const MapContainer = () => {
     });
 
     const nav = new mapboxgl.NavigationControl();
-    map.current.addControl(nav, "bottom-left");
-  });
+    map.current.addControl(nav, "top-left");
+
+    map.current.addControl(
+      new mapboxgl.GeolocateControl({
+        positionOptions: {
+          enableHighAccuracy: true,
+        },
+        trackUserLocation: true,
+        showUserHeading: true,
+      })
+    );
+  }, []);
   return (
     <>
       <Box sx={{ height: "100%", width: "100%" }} ref={mapContainer} />

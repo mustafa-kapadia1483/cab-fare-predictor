@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AppShell,
   Navbar,
@@ -9,17 +9,56 @@ import {
   MediaQuery,
   Burger,
   useMantineTheme,
-  TextInput,
+  ActionIcon,
   Group,
   Autocomplete,
+  useMantineColorScheme,
 } from "@mantine/core";
+import { MoonStars, Sun } from "tabler-icons-react";
 import axios from "axios";
+import mapboxgl from "mapbox-gl";
+import MapContainer from "../map/MapContainer";
 
 export default function Layout({ children }) {
-  const [value, setValue] = useState("");
-  const [data, setData] = useState([]);
+  const [pickupValue, setPickupValue] = useState("");
+  const [pickupData, setPickupData] = useState([]);
+  const [dropValue, setDropValue] = useState("");
+  const [dropData, setDropData] = useState([]);
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const dark = colorScheme === "dark";
+  const [placesData, setPlacesData] = useState([]);
+  const map = useRef(null);
   const theme = useMantineTheme();
   const [opened, setOpened] = useState(false);
+
+  useEffect(() => {
+    let lat, long;
+    navigator.geolocation.getCurrentPosition(async position => {
+      lat = position.coords.latitude;
+      long = position.coords.longitude;
+      // console.log(position);
+
+      const placesData = await axios
+        .get(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${lat},${long}.json`,
+          {
+            params: {
+              access_token: process.env.NEXT_PUBLIC_MAPBOX_GL_ACCESS_TOKEN,
+            },
+          }
+        )
+        .then(res => res.data)
+        .catch(function (error) {
+          // handle error
+          console.log(error);
+        });
+      // console.log("placesData", placesData);
+      setPlacesData(placesData);
+      setPickupData(
+        placesData?.features?.map(({ place_name }) => place_name) ?? []
+      );
+    });
+  }, []);
 
   const debounce = (func, delay = 1000) => {
     let timeoutId;
@@ -37,45 +76,62 @@ export default function Layout({ children }) {
 
   const pickupChangeHandler = async () => {
     const data = await axios
-      .get(`https://api.mapbox.com/geocoding/v5/mapbox.places/${value}.json`, {
-        params: {
-          access_token: process.env.NEXT_PUBLIC_MAPBOX_GL_ACCESS_TOKEN,
-          autocomplete: true,
-        },
-      })
+      .get(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${pickupValue}.json`,
+        {
+          params: {
+            access_token: process.env.NEXT_PUBLIC_MAPBOX_GL_ACCESS_TOKEN,
+            autocomplete: true,
+            country: "IN",
+          },
+        }
+      )
       .then(res => res.data)
       .catch(function (error) {
         // handle error
         console.log(error);
       });
 
-    console.log(data);
+    // console.log(data);
+    setPlacesData(data);
+    setPickupData(data?.features?.map(({ place_name }) => place_name));
+  };
 
-    setData(data?.features?.map(({ place_name }) => place_name));
+  const pickupItemSubmitHandler = item => {
+    console.log(item);
+    const pickupFeature = placesData.features.filter(
+      ({ place_name }) => place_name === item.value
+    )[0];
+
+    const [lat, long] = pickupFeature.geometry.coordinates;
+
+    const marker = new mapboxgl.Marker({ draggable: true })
+      .setLngLat(pickupFeature.center)
+      .addTo(map.current);
+
+    console.log(marker.getLngLat());
+
+    console.log("Pickup Feature", pickupFeature);
+    console.log("Pickup Data", pickupData);
   };
 
   return (
     <AppShell
+      padding={0}
       styles={{
         main: {
           background:
             theme.colorScheme === "dark"
               ? theme.colors.dark[8]
               : theme.colors.gray[0],
-          // padding: 1,
         },
         body: {
           height: "100%",
         },
       }}
-      navbarOffsetBreakpoint="xl"
+      // navbarOffsetBreakpoint="sm"
       navbar={
-        <Navbar
-          p="md"
-          hiddenBreakpoint={5000}
-          hidden={!opened}
-          width={{ sm: 200, lg: 300 }}
-        >
+        <Navbar p="md" hiddenBreakpoint={5000} hidden={!opened}>
           <Text>Cab Fare Predictor</Text>
         </Navbar>
       }
@@ -102,25 +158,37 @@ export default function Layout({ children }) {
 
               <Text>Cab Fare Predictor</Text>
             </Group>
-            <Group>
-              <Autocomplete
-                placeholder="Pickup Location"
-                value={value}
-                onChange={setValue}
-                onKeyDown={debounce(pickupChangeHandler)}
-                data={data}
-              />
-              {/* <Autocomplete
-                placeholder="Drop Location"
-                value={value}
-                onChange={setValue}
-                data={[]}
-              /> */}
-            </Group>
+            <MediaQuery smallerThan="sm" styles={{ display: "none" }}>
+              <Group>
+                <Autocomplete
+                  placeholder="Pickup Location"
+                  value={pickupValue}
+                  onChange={setPickupValue}
+                  onKeyDown={debounce(pickupChangeHandler)}
+                  onItemSubmit={pickupItemSubmitHandler}
+                  data={pickupData}
+                />
+                <Autocomplete
+                  placeholder="Drop Location"
+                  value={dropValue}
+                  onChange={setDropValue}
+                  data={dropData}
+                />
+                <ActionIcon
+                  variant="outline"
+                  color={dark ? "yellow" : "blue"}
+                  onClick={() => toggleColorScheme()}
+                  title="Toggle color scheme"
+                >
+                  {dark ? <Sun size={18} /> : <MoonStars size={18} />}
+                </ActionIcon>
+              </Group>
+            </MediaQuery>
           </div>
         </Header>
       }
     >
+      <MapContainer map={map} />
       {children}
     </AppShell>
   );

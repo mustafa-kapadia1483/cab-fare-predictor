@@ -1,20 +1,28 @@
 import Layout from "../components/layout/Layout";
-import { MantineProvider } from "@mantine/core";
+import { ColorSchemeProvider, MantineProvider } from "@mantine/core";
+import { useState } from "react";
 
 function MyApp({ Component, pageProps }) {
+  const [colorScheme, setColorScheme] = useState("dark");
+  const toggleColorScheme = value =>
+    setColorScheme(value || (colorScheme === "dark" ? "light" : "dark"));
   return (
-    <MantineProvider
-      withGlobalStyles
-      withNormalizeCSS
-      theme={{
-        /** Put your mantine theme override here */
-        colorScheme: "dark",
-      }}
+    <ColorSchemeProvider
+      colorScheme={colorScheme}
+      toggleColorScheme={toggleColorScheme}
     >
-      <Layout>
-        <Component {...pageProps} />
-      </Layout>
-    </MantineProvider>
+      <MantineProvider
+        withGlobalStyles
+        withNormalizeCSS
+        theme={{
+          colorScheme,
+        }}
+      >
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
+      </MantineProvider>
+    </ColorSchemeProvider>
   );
 }
 
